@@ -25,12 +25,15 @@
     </script>
     
     <style>
-        /* Empêcher le zoom automatique sur iPhone lors de la saisie */
         input, select, textarea { font-size: 16px !important; }
         .wine-card { transition: transform 0.2s; }
         .wine-card:active { transform: scale(0.98); }
         .loader { border: 3px solid #333; border-top: 3px solid #D4AF37; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Style pour les inputs du formulaire d'édition */
+        .edit-input { background: #2A2A2A; border: 1px solid #444; color: white; padding: 10px; border-radius: 8px; width: 100%; margin-bottom: 10px; }
+        .edit-input:focus { border-color: #D4AF37; outline: none; }
+        .edit-label { font-size: 12px; color: #D4AF37; margin-bottom: 4px; display: block; text-transform: uppercase; font-weight: bold; }
     </style>
 </head>
 <body class="bg-wine-dark text-wine-text font-sans min-h-screen pb-10">
@@ -96,29 +99,21 @@
     <div id="modal-camera" class="fixed inset-0 bg-black z-50 hidden flex flex-col">
         <div class="relative flex-grow flex items-center justify-center bg-black">
             <video id="video" autoplay playsinline class="absolute inset-0 w-full h-full object-cover"></video>
-            
-            <div class="absolute border-2 border-wine-gold/50 w-64 h-80 rounded-2xl pointer-events-none z-10">
-                <div class="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-wine-gold -mt-1 -ml-1"></div>
-                <div class="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-wine-gold -mt-1 -mr-1"></div>
-                <div class="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-wine-gold -mb-1 -ml-1"></div>
-                <div class="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-wine-gold -mb-1 -mr-1"></div>
-            </div>
+            <div class="absolute border-2 border-wine-gold/50 w-64 h-80 rounded-2xl pointer-events-none z-10"></div>
             <canvas id="canvas" class="hidden"></canvas>
         </div>
-
         <div class="bg-wine-card p-8 pb-12 rounded-t-3xl border-t border-gray-800 z-20">
             <div id="actions-camera" class="flex flex-col items-center gap-6">
                 <p class="text-white/80 font-serif italic">Cadrez l'étiquette</p>
                 <div class="flex justify-between w-full max-w-xs items-center">
                     <button onclick="fermerCamera()" class="text-gray-400 p-4">Annuler</button>
                     <button onclick="prendrePhoto()" class="w-20 h-20 bg-white rounded-full border-4 border-gray-300 shadow-xl active:scale-90 transition"></button>
-                    <div class="w-16"></div> </div>
+                    <div class="w-16"></div> 
+                </div>
             </div>
-            
             <div id="loading-state" class="hidden flex flex-col items-center justify-center py-4">
                 <div class="loader mb-4"></div>
                 <p class="text-wine-gold text-lg animate-pulse font-serif">Analyse en cours...</p>
-                <p class="text-gray-500 text-xs mt-2">Envoi vers le sommelier IA</p>
             </div>
         </div>
     </div>
@@ -126,18 +121,74 @@
     <div id="modal-sommelier" class="fixed inset-0 bg-black/90 hidden flex items-end md:items-center justify-center z-[70]">
         <div class="bg-wine-card border-t md:border border-wine-gold/30 w-full md:max-w-xl md:rounded-3xl rounded-t-3xl p-8 relative h-[80vh] md:h-auto flex flex-col">
             <button onclick="document.getElementById('modal-sommelier').classList.add('hidden')" class="absolute top-4 right-4 text-gray-400 text-2xl p-2">✕</button>
-            
             <div class="text-center mb-4">
                 <div class="text-4xl mb-2">🍷</div>
                 <h3 id="sommelier-titre" class="font-serif text-2xl text-white italic">Conseils</h3>
             </div>
-            
             <div class="overflow-y-auto flex-grow">
                  <div id="sommelier-chargement" class="hidden py-10 text-center">
                     <div class="loader mx-auto mb-4"></div>
                     <p class="text-gray-500 animate-pulse">Rédaction des conseils...</p>
                 </div>
                 <div id="sommelier-reponse" class="text-gray-300 text-sm leading-7 text-justify pb-10"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-edition" class="fixed inset-0 bg-black/90 hidden flex items-center justify-center z-[80] p-4">
+        <div class="bg-wine-card w-full max-w-lg rounded-2xl border border-gray-700 p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-2">
+                <h3 class="font-serif text-xl text-wine-gold italic">Modifier la bouteille</h3>
+                <button onclick="fermerEdition()" class="text-gray-400 text-2xl">✕</button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="edit-label">Nom du vin</label>
+                    <input type="text" id="edit-nom" class="edit-input">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="edit-label">Millésime</label>
+                        <input type="number" id="edit-annee" class="edit-input">
+                    </div>
+                    <div>
+                        <label class="edit-label">Type</label>
+                        <select id="edit-type" class="edit-input">
+                            <option value="Rouge">Rouge</option>
+                            <option value="Blanc">Blanc</option>
+                            <option value="Rosé">Rosé</option>
+                            <option value="Effervescent">Effervescent</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="edit-label">Région</label>
+                    <input type="text" id="edit-region" class="edit-input">
+                </div>
+
+                <div>
+                    <label class="edit-label">Cépages</label>
+                    <input type="text" id="edit-cepage" class="edit-input">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="edit-label">Prix (€)</label>
+                        <input type="text" id="edit-prix" class="edit-input">
+                    </div>
+                    <div>
+                        <label class="edit-label text-wine-gold">Rangée</label>
+                        <input type="number" id="edit-rangee" class="edit-input border-wine-gold/50 text-wine-gold font-bold">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 flex gap-3">
+                <button onclick="fermerEdition()" class="flex-1 py-3 bg-gray-800 rounded-lg text-gray-300 font-bold text-sm">Annuler</button>
+                <button onclick="sauvegarderEdition()" class="flex-1 py-3 bg-wine-gold text-black rounded-lg font-bold text-sm hover:bg-yellow-500 transition">Enregistrer</button>
             </div>
         </div>
     </div>
@@ -150,6 +201,7 @@
         
         let tousLesVins = [];
         let stream = null;
+        let idVinEnEdition = null; // Stocke l'ID du vin qu'on modifie
 
         // --- GESTION DES DONNÉES ---
         async function chargerVins() {
@@ -197,11 +249,14 @@
             const img = (vin.image_url && vin.image_url.trim() !== "") ? vin.image_url : "https://images.unsplash.com/photo-1559563362-c667ba5f5480?auto=format&fit=crop&q=80&w=800";
             const badge = vin.type_vin === 'Rouge' ? 'bg-wine-red' : (vin.type_vin === 'Blanc' ? 'bg-yellow-100 text-black' : 'bg-pink-400');
             
+            // Note: j'ai ajouté onclick="ouvrirEdition(${vin.id})" sur l'image
             return `
             <div class="wine-card bg-wine-card rounded-xl overflow-hidden border border-gray-800 flex flex-col h-full shadow-lg relative">
-                <div class="h-40 relative">
+                <div class="h-40 relative cursor-pointer" onclick="ouvrirEdition(${vin.id})">
                     <img src="${img}" class="w-full h-full object-cover opacity-90">
+                    <div class="absolute inset-0 bg-black/20 hover:bg-black/0 transition"></div>
                     <span class="absolute bottom-2 right-2 ${badge} text-[10px] px-2 py-1 rounded-md uppercase font-bold shadow-sm">${vin.type_vin || 'VIN'}</span>
+                    <span class="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full text-xs">✏️</span>
                 </div>
                 <div class="p-3 flex flex-col flex-grow">
                     <h3 class="font-serif text-sm text-white font-bold leading-tight mb-1 uppercase">${vin.nom || 'Sans Nom'}</h3>
@@ -215,21 +270,65 @@
             </div>`;
         }
 
+        // --- EDITION MANUELLE ---
+        function ouvrirEdition(id) {
+            const vin = tousLesVins.find(v => v.id === id);
+            if (!vin) return;
+
+            idVinEnEdition = id;
+            document.getElementById('edit-nom').value = vin.nom || "";
+            document.getElementById('edit-annee').value = vin.annee || "";
+            document.getElementById('edit-type').value = vin.type_vin || "Rouge";
+            document.getElementById('edit-region').value = vin.region || "";
+            document.getElementById('edit-cepage').value = vin.cepage || "";
+            document.getElementById('edit-prix').value = vin.prix_moyen || "";
+            document.getElementById('edit-rangee').value = vin.rangee || 1;
+
+            document.getElementById('modal-edition').classList.remove('hidden');
+        }
+
+        function fermerEdition() {
+            document.getElementById('modal-edition').classList.add('hidden');
+            idVinEnEdition = null;
+        }
+
+        async function sauvegarderEdition() {
+            if (!idVinEnEdition) return;
+
+            const updates = {
+                nom: document.getElementById('edit-nom').value,
+                annee: document.getElementById('edit-annee').value,
+                type_vin: document.getElementById('edit-type').value,
+                region: document.getElementById('edit-region').value,
+                cepage: document.getElementById('edit-cepage').value,
+                prix_moyen: document.getElementById('edit-prix').value,
+                rangee: document.getElementById('edit-rangee').value
+            };
+
+            const { error } = await supabaseClient
+                .from('bouteilles')
+                .update(updates)
+                .eq('id', idVinEnEdition);
+
+            if (error) {
+                alert("Erreur lors de la mise à jour");
+                console.error(error);
+            } else {
+                fermerEdition();
+                chargerVins(); // Recharge la grille pour voir les changements
+            }
+        }
+
         // --- CAMERA MOBILE ---
         async function ouvrirCamera() {
             try {
-                // "environment" force la caméra arrière sur mobile
-                const constraints = { 
-                    video: { 
-                        facingMode: "environment" 
-                    } 
-                };
+                const constraints = { video: { facingMode: "environment" } };
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 const video = document.getElementById('video');
                 video.srcObject = stream;
                 document.getElementById('modal-camera').classList.remove('hidden');
             } catch (e) {
-                alert("Impossible d'accéder à la caméra. Vérifiez que vous êtes en HTTPS et que vous avez autorisé l'accès.");
+                alert("Impossible d'accéder à la caméra.");
                 console.error(e);
             }
         }
@@ -238,19 +337,14 @@
             document.getElementById('modal-camera').classList.add('hidden');
             if (stream) stream.getTracks().forEach(t => t.stop());
         }
-
         
         function prendrePhoto() {
-            // On cache les boutons et on affiche le chargement
             document.getElementById('actions-camera').classList.add('hidden');
             document.getElementById('loading-state').classList.remove('hidden');
 
             const video = document.getElementById('video');
             const canvas = document.getElementById('canvas');
-            
-            // Récupération sécurisée de la rangée
             const inputRangee = document.getElementById('input-rangee-scan');
-            // Si vide, on force "1", sinon on prend la valeur
             const valeurRangee = inputRangee.value ? inputRangee.value.toString() : "1";
 
             canvas.width = video.videoWidth;
@@ -260,25 +354,16 @@
             canvas.toBlob(blob => {
                 const fd = new FormData();
                 fd.append('data', blob, 'mobile-capture.jpg'); 
-                
-                // C'est ici que l'envoi se fait
                 fd.append('rangee', valeurRangee); 
-
-                console.log("Envoi de la rangée :", valeurRangee); // Pour vérifier dans la console du navigateur
 
                 fetch(WEBHOOK_N8N_URL, { method: 'POST', body: fd })
                 .then(res => {
                     if (res.ok) {
                         fermerCamera();
                         setTimeout(chargerVins, 4000); 
-                    } else {
-                        alert("Erreur serveur N8N.");
-                    }
+                    } else { alert("Erreur serveur N8N."); }
                 })
-                .catch(e => {
-                    alert("Erreur réseau : " + e);
-                    console.error(e);
-                })
+                .catch(e => { alert("Erreur réseau"); })
                 .finally(() => {
                     document.getElementById('actions-camera').classList.remove('hidden');
                     document.getElementById('loading-state').classList.add('hidden');
@@ -286,7 +371,7 @@
             }, 'image/jpeg', 0.8);
         }
         
-        // --- AUTRES FONCTIONS ---
+        // --- SOMMELIER & AUTRES ---
         async function demanderConseil(nomVin) {
             const modale = document.getElementById('modal-sommelier');
             const reponseDiv = document.getElementById('sommelier-reponse');
