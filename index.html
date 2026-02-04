@@ -292,18 +292,31 @@
             idVinEnEdition = null;
         }
 
+
+
+
         async function sauvegarderEdition() {
             if (!idVinEnEdition) return;
 
+            // 1. Récupération et nettoyage des valeurs numériques
+            const inputAnnee = document.getElementById('edit-annee').value;
+            const inputRangee = document.getElementById('edit-rangee').value;
+            
+            // Si le champ est vide, on envoie null, sinon on convertit en Entier (Integer)
+            const anneePropre = inputAnnee ? parseInt(inputAnnee) : null;
+            const rangeePropre = inputRangee ? parseInt(inputRangee) : null;
+
             const updates = {
                 nom: document.getElementById('edit-nom').value,
-                annee: document.getElementById('edit-annee').value,
+                annee: anneePropre, 
                 type_vin: document.getElementById('edit-type').value,
                 region: document.getElementById('edit-region').value,
                 cepage: document.getElementById('edit-cepage').value,
                 prix_moyen: document.getElementById('edit-prix').value,
-                rangee: document.getElementById('edit-rangee').value
+                rangee: rangeePropre
             };
+
+            console.log("Données envoyées :", updates); // Pour le debug dans la console
 
             const { error } = await supabaseClient
                 .from('bouteilles')
@@ -311,8 +324,9 @@
                 .eq('id', idVinEnEdition);
 
             if (error) {
-                alert("Erreur lors de la mise à jour");
-                console.error(error);
+                console.error("Erreur Supabase compléte:", error);
+                // On affiche le message précis pour comprendre le problème
+                alert("Erreur lors de la sauvegarde : " + error.message + "\n(Code: " + error.code + ")");
             } else {
                 fermerEdition();
                 chargerVins(); // Recharge la grille pour voir les changements
