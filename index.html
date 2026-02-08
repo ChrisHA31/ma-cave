@@ -32,10 +32,17 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .edit-input { background: #2A2A2A; border: 1px solid #444; color: white; padding: 10px; border-radius: 8px; width: 100%; margin-bottom: 10px; }
         .edit-input:focus { border-color: #D4AF37; outline: none; }
-        .edit-label { font-size: 12px; color: #D4AF37; margin-bottom: 4px; display: block; text-transform: uppercase; font-weight: bold; }
+        
+        /* Masquer la scrollbar tout en gardant le scroll */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="bg-wine-dark text-wine-text font-sans min-h-screen pb-10">
+<body class="bg-wine-dark text-wine-text font-sans min-h-screen pb-24">
+
+    <div id="toast" class="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-wine-gold text-black px-6 py-3 rounded-full shadow-2xl z-[60] font-bold text-sm hidden transition-opacity duration-300 opacity-0 flex items-center gap-2">
+        <span class="animate-spin">⏳</span> <span id="toast-message">Message</span>
+    </div>
 
     <nav class="border-b border-gray-800 p-4 sticky top-0 bg-wine-dark/95 backdrop-blur-md z-40 shadow-md">
         <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
@@ -114,7 +121,7 @@
             </div>
             <div id="loading-state" class="hidden flex flex-col items-center justify-center py-4">
                 <div class="loader mb-4"></div>
-                <p class="text-wine-gold text-lg animate-pulse font-serif">Analyse en cours...</p>
+                <p class="text-wine-gold text-lg animate-pulse font-serif">Envoi de la photo...</p>
             </div>
         </div>
     </div>
@@ -170,7 +177,7 @@
         // --- CONFIGURATION ---
         const WEBHOOK_N8N_SCAN = "https://n8n-appart.duckdns.org/webhook/scan-wine";
         const WEBHOOK_N8N_CONSEIL = "https://n8n-appart.duckdns.org/webhook/conseil-sommelier";
-        const WEBHOOK_N8N_ACCORD = "https://n8n-appart.duckdns.org/webhook/accord-mets-vins"; // NOUVEAU
+        const WEBHOOK_N8N_ACCORD = "https://n8n-appart.duckdns.org/webhook/accord-mets-vins";
 
         const SUPABASE_URL = "https://yriamevchyqcwszoodpe.supabase.co"; 
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlyaWFtZXZjaHlxY3dzem9vZHBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxMTM2NDksImV4cCI6MjA4NDY4OTY0OX0.fi8O2iW7acEm9XBnc2pjZMmX8dKxcrDBiTSiz1z9vNg";
@@ -190,21 +197,49 @@
             }
         }
 
+        // --- NOUVELLE FONCTION D'AFFICHAGE EN MODE SWIPE ---
         function afficherGrille(vinsAafficher, estFiltre = false) {
             const grille = document.getElementById('grille-vins');
             grille.innerHTML = '';
-            for (let r = 1; r <= 8; r++) {
+            
+            // On détermine quelles rangées afficher (1 à 8)
+            const rangeesActives = estFiltre ? [1,2,3,4,5,6,7,8] : [1,2,3,4,5,6,7,8]; 
+            // Note: si filtré, on affiche quand même par rangée pour garder la structure, 
+            // mais les rangées vides seront sautées plus bas.
+
+            for (let r of rangeesActives) {
                 const vinsDeLaRangee = vinsAafficher.filter(v => v.rangee == r);
-                if (vinsDeLaRangee.length === 0 && estFiltre) continue;
+                
+                // Si la rangée est vide, on ne l'affiche pas (sauf si on veut forcer l'affichage des étagères vides)
+                if (vinsDeLaRangee.length === 0) continue;
                 
                 const section = document.createElement('div');
-                section.className = "mb-8";
-                section.innerHTML = `
-                    <h3 class="font-serif text-lg text-wine-gold mb-4 border-b border-gray-800 pb-2 italic sticky top-16 bg-wine-dark/95 py-2 z-30">Rangée ${r}</h3>
-                    <div class="grid grid-cols-2 gap-4">
+                section.className = "mb-6"; // Marge entre les rangées
+                
+                // Titre de la rangée (Sticky)
+                const titreHTML = `
+                    <div class="sticky top-16 bg-wine-dark/95 z-30 py-2 mb-2 border-b border-gray-800 flex justify-between items-end px-1">
+                        <h3 class="font-serif text-lg text-wine-gold italic">Rangée ${r}</h3>
+                        <span class="text-xs text-gray-500">${vinsDeLaRangee.length} bouteille(s)</span>
+                    </div>
+                `;
+
+                // Conteneur Swipe (Horizontal Scroll)
+                // snap-x snap-mandatory: force l'arrêt sur une carte
+                // overflow-x-auto: active le scroll horizontal
+                const carouselHTML = `
+                    <div class="flex overflow-x-auto gap-4 pb-4 px-1 snap-x snap-mandatory scrollbar-hide">
                         ${vinsDeLaRangee.map(v => genererCarte(v)).join('')}
-                    </div>`;
+                    </div>
+                `;
+
+                section.innerHTML = titreHTML + carouselHTML;
                 grille.appendChild(section);
+            }
+            
+            // Si tout est vide
+            if (grille.innerHTML === '') {
+                grille.innerHTML = '<div class="text-center text-gray-500 mt-10 italic">Aucun vin trouvé...</div>';
             }
         }
 
@@ -212,30 +247,94 @@
             const img = (vin.image_url && vin.image_url.trim() !== "") ? vin.image_url : "https://images.unsplash.com/photo-1559563362-c667ba5f5480?auto=format&fit=crop&q=80&w=800";
             const badge = vin.type_vin === 'Rouge' ? 'bg-wine-red' : (vin.type_vin === 'Blanc' ? 'bg-yellow-100 text-black' : 'bg-pink-400');
             
+            // Adaptation CSS pour le Swipe :
+            // min-w-[45%] : sur mobile, on voit presque 2 cartes et demi.
+            // md:min-w-[200px] : sur ordi, taille fixe.
+            // snap-center : la carte se centre à l'arrêt du scroll.
             return `
-            <div id="card-${vin.id}" class="wine-card bg-wine-card rounded-xl overflow-hidden border border-gray-800 flex flex-col h-full shadow-lg relative">
-                <div class="h-40 relative cursor-pointer" onclick="ouvrirEdition(${vin.id})">
+            <div id="card-${vin.id}" class="snap-center shrink-0 min-w-[160px] w-[45%] md:w-[200px] bg-wine-card rounded-xl overflow-hidden border border-gray-800 flex flex-col shadow-lg relative h-[280px]">
+                <div class="h-40 relative cursor-pointer flex-shrink-0" onclick="ouvrirEdition(${vin.id})">
                     <img src="${img}" class="w-full h-full object-cover opacity-90">
                     <span class="absolute bottom-2 right-2 ${badge} text-[10px] px-2 py-1 rounded-md uppercase font-bold shadow-sm">${vin.type_vin || 'VIN'}</span>
                     <span class="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full text-xs">✏️</span>
                 </div>
                 <div class="p-3 flex flex-col flex-grow">
-                    <h3 class="font-serif text-sm text-white font-bold leading-tight mb-1 uppercase">${vin.nom || 'Sans Nom'}</h3>
-                    <p class="text-wine-gold text-[10px] italic mb-2">${vin.region || 'Region NC'} • ${vin.annee || 'NC'}</p>
+                    <h3 class="font-serif text-sm text-white font-bold leading-tight mb-1 uppercase truncate">${vin.nom || 'Sans Nom'}</h3>
+                    <p class="text-wine-gold text-[10px] italic mb-2 truncate">${vin.region || 'Region NC'} • ${vin.annee || 'NC'}</p>
                     <div class="mt-auto flex gap-2 pt-2">
-                        <button onclick="demanderConseil('${(vin.nom || 'Vin').replace(/'/g, "\\'")}')" class="flex-1 py-2 bg-gray-800 text-wine-gold rounded-lg text-[10px] font-bold border border-gray-700">Conseil</button>
-                        <button onclick="supprimerVin(${vin.id})" class="flex-1 py-2 bg-red-900/20 text-red-400 rounded-lg text-[10px] font-bold border border-red-900/30">Bue</button>
+                        <button onclick="demanderConseil('${(vin.nom || 'Vin').replace(/'/g, "\\'")}')" class="flex-1 py-2 bg-gray-800 text-wine-gold rounded-lg text-[10px] font-bold border border-gray-700 active:bg-gray-700">Conseil</button>
+                        <button onclick="supprimerVin(${vin.id})" class="flex-1 py-2 bg-red-900/20 text-red-400 rounded-lg text-[10px] font-bold border border-red-900/30 active:bg-red-900/40">Bue</button>
                     </div>
                 </div>
             </div>`;
         }
 
-        // --- NOUVELLE FONCTION : ACCORD METS/VINS ---
+        // --- NOTIFICATION TOAST ---
+        function afficherToast(message, duree = 3000) {
+            const toast = document.getElementById('toast');
+            const msgSpan = document.getElementById('toast-message');
+            msgSpan.innerText = message;
+            
+            toast.classList.remove('hidden');
+            // Petit hack pour forcer le navigateur à prendre en compte le remove 'hidden' avant de changer l'opacité
+            setTimeout(() => { toast.classList.remove('opacity-0'); }, 10);
+
+            if (duree > 0) {
+                setTimeout(() => {
+                    toast.classList.add('opacity-0');
+                    setTimeout(() => { toast.classList.add('hidden'); }, 300);
+                }, duree);
+            }
+        }
+
+        // --- PHOTO AVEC REFRESH 10 SECONDES ---
+        function prendrePhoto() {
+            document.getElementById('actions-camera').classList.add('hidden');
+            document.getElementById('loading-state').classList.remove('hidden');
+            
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            const inputRangee = document.getElementById('input-rangee-scan');
+            const valeurRangee = inputRangee.value ? inputRangee.value.toString() : "1";
+
+            canvas.toBlob(blob => {
+                const fd = new FormData();
+                fd.append('data', blob, 'capture.jpg'); 
+                fd.append('rangee', valeurRangee);
+                
+                fetch(WEBHOOK_N8N_SCAN, { method: 'POST', body: fd })
+                .then(res => { 
+                    if(res.ok) { 
+                        fermerCamera(); 
+                        // Lancer le timer de 10 secondes avec Feedback visuel
+                        afficherToast("Analyse en cours... Mise à jour dans 10s", 10000);
+                        
+                        setTimeout(() => {
+                            chargerVins().then(() => {
+                                afficherToast("Cave mise à jour !", 3000);
+                            });
+                        }, 10000); // 10 secondes
+                    } 
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Erreur lors de l'envoi");
+                })
+                .finally(() => { 
+                    document.getElementById('actions-camera').classList.remove('hidden'); 
+                    document.getElementById('loading-state').classList.add('hidden');
+                });
+            }, 'image/jpeg', 0.8);
+        }
+
+        // --- ACCORD METS VINS ---
         async function lancerAccordMetsVins() {
             const plat = prompt("Quel plat allez-vous manger ? (ex: Boeuf Bourguignon, Sushi...)");
             if (!plat) return;
 
-            // 1. Ouvrir la modale en mode chargement
             const modale = document.getElementById('modal-sommelier');
             const reponseDiv = document.getElementById('sommelier-reponse');
             const chargement = document.getElementById('sommelier-chargement');
@@ -246,8 +345,6 @@
             reponseDiv.innerHTML = "";
             titre.innerText = "Accord pour : " + plat;
 
-            // 2. Préparer la liste des vins (version allégée pour pas surcharger l'IA)
-            // On envoie : id, nom, année, type, région
             const caveLegere = tousLesVins.map(v => ({
                 id: v.id,
                 nom: v.nom,
@@ -257,26 +354,20 @@
             }));
 
             try {
-                // 3. Appel à N8N
                 const res = await fetch(WEBHOOK_N8N_ACCORD, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
                     body: JSON.stringify({ plat: plat, vins: caveLegere }) 
                 });
 
-                const data = await res.json(); // On attend un JSON { id: 123, raison: "..." }
-
-                // 4. Affichage du résultat
+                const data = await res.json();
                 chargement.classList.add('hidden');
                 
                 if (data.id) {
-                    // Afficher l'explication
                     reponseDiv.innerHTML = `<strong class="text-wine-gold text-lg block mb-2">Je vous recommande :</strong>${data.raison}`;
-                    
-                    // Filtrer la grille pour ne montrer QUE ce vin
                     const vinChoisi = tousLesVins.find(v => v.id === data.id);
                     if (vinChoisi) {
-                        afficherGrille([vinChoisi], true); // true = mode filtré
+                        afficherGrille([vinChoisi], true);
                     }
                 } else {
                     reponseDiv.innerText = "Je n'ai pas trouvé d'accord idéal dans votre cave.";
@@ -289,7 +380,7 @@
             }
         }
 
-        // --- AUTRES FONCTIONS (Conservation du code existant) ---
+        // --- FONCTIONS EXISTANTES ---
         function mettreAJourStats(vins) {
             document.getElementById('stat-total').innerText = vins.length;
             document.getElementById('stat-rouge').innerText = vins.filter(v => v.type_vin === 'Rouge').length;
@@ -345,37 +436,12 @@
                 stream = streamData;
                 document.getElementById('video').srcObject = stream;
                 document.getElementById('modal-camera').classList.remove('hidden');
-            } catch (e) { alert("Erreur caméra"); }
+            } catch (e) { alert("Erreur caméra : Vérifiez les permissions HTTPS"); }
         }
 
         function fermerCamera() {
             document.getElementById('modal-camera').classList.add('hidden');
             if (stream) stream.getTracks().forEach(t => t.stop());
-        }
-
-        function prendrePhoto() {
-            document.getElementById('actions-camera').classList.add('hidden');
-            document.getElementById('loading-state').classList.remove('hidden');
-            const video = document.getElementById('video');
-            const canvas = document.getElementById('canvas');
-            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            
-            const inputRangee = document.getElementById('input-rangee-scan');
-            const valeurRangee = inputRangee.value ? inputRangee.value.toString() : "1";
-
-            canvas.toBlob(blob => {
-                const fd = new FormData();
-                fd.append('data', blob, 'capture.jpg'); 
-                fd.append('rangee', valeurRangee);
-                fetch(WEBHOOK_N8N_SCAN, { method: 'POST', body: fd })
-                .then(res => { if(res.ok) { fermerCamera(); setTimeout(chargerVins, 4000); } })
-                .catch(console.error)
-                .finally(() => { 
-                    document.getElementById('actions-camera').classList.remove('hidden'); 
-                    document.getElementById('loading-state').classList.add('hidden');
-                });
-            }, 'image/jpeg', 0.8);
         }
 
         async function demanderConseil(nomVin) {
@@ -395,7 +461,10 @@
         }
 
         async function supprimerVin(id) {
-            if (confirm("Supprimer ?")) { await supabaseClient.from('bouteilles').delete().eq('id', id); chargerVins(); }
+            if (confirm("Supprimer cette bouteille ?")) { 
+                await supabaseClient.from('bouteilles').delete().eq('id', id); 
+                chargerVins(); 
+            }
         }
 
         function filtrerVins(c) { afficherGrille(c === 'all' ? tousLesVins : tousLesVins.filter(v => v.type_vin === c), c !== 'all'); }
