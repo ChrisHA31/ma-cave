@@ -92,10 +92,19 @@
             </div>
             
             <div class="flex items-center gap-3 w-full">
-                <div class="flex items-center gap-2 bg-gray-900 px-4 py-3 rounded-xl border border-gray-700 shrink-0">
-                    <span class="text-xs text-gray-500 italic">Rangée</span>
-                    <input type="number" id="input-rangee-scan" min="1" max="8" value="1" inputmode="numeric" 
-                           class="bg-transparent text-wine-gold font-bold w-6 text-center focus:outline-none text-lg">
+                <div class="flex items-center gap-2 bg-gray-900 px-3 py-3 rounded-xl border border-gray-700 shrink-0">
+                    <span class="text-xs text-gray-500 italic">Pos.</span>
+                    <select id="input-rangee-scan" class="bg-transparent text-wine-gold font-bold focus:outline-none text-base appearance-none cursor-pointer">
+                        <option value="1">Rangée 1</option>
+                        <option value="2">Rangée 2</option>
+                        <option value="3">Rangée 3</option>
+                        <option value="4">Rangée 4</option>
+                        <option value="5">Rangée 5</option>
+                        <option value="6">Rangée 6</option>
+                        <option value="7">Rangée 7</option>
+                        <option value="8">Rangée 8</option>
+                        <option value="9">⭐ Wish List</option>
+                    </select>
                 </div>
                 <button onclick="ouvrirCamera()" class="flex-grow bg-wine-gold text-black font-bold py-3 rounded-xl hover:bg-yellow-500 active:scale-95 transition shadow-lg uppercase tracking-widest text-sm flex justify-center items-center gap-2">
                     <span class="text-lg">📸</span> Scanner
@@ -163,7 +172,17 @@
                 <input type="text" id="edit-cepage" class="edit-input" placeholder="Cépage">
                 <div class="grid grid-cols-2 gap-4">
                     <input type="text" id="edit-prix" class="edit-input" placeholder="Prix">
-                    <input type="number" id="edit-rangee" class="edit-input border-wine-gold/50 text-wine-gold font-bold" placeholder="Rangée">
+                    <select id="edit-rangee" class="edit-input border-wine-gold/50 text-wine-gold font-bold">
+                        <option value="1">Rangée 1</option>
+                        <option value="2">Rangée 2</option>
+                        <option value="3">Rangée 3</option>
+                        <option value="4">Rangée 4</option>
+                        <option value="5">Rangée 5</option>
+                        <option value="6">Rangée 6</option>
+                        <option value="7">Rangée 7</option>
+                        <option value="8">Rangée 8</option>
+                        <option value="9">⭐ Wish List</option>
+                    </select>
                 </div>
             </div>
             <div class="mt-8 flex gap-3">
@@ -197,36 +216,32 @@
             }
         }
 
-        // --- NOUVELLE FONCTION D'AFFICHAGE EN MODE SWIPE ---
+        // --- AFFICHAGE EN MODE SWIPE AVEC WISH LIST ---
         function afficherGrille(vinsAafficher, estFiltre = false) {
             const grille = document.getElementById('grille-vins');
             grille.innerHTML = '';
             
-            // On détermine quelles rangées afficher (1 à 8)
-            const rangeesActives = estFiltre ? [1,2,3,4,5,6,7,8] : [1,2,3,4,5,6,7,8]; 
-            // Note: si filtré, on affiche quand même par rangée pour garder la structure, 
-            // mais les rangées vides seront sautées plus bas.
+            // On ajoute la rangée 9 qui correspond à la Wish List
+            const rangeesActives = estFiltre ? [1,2,3,4,5,6,7,8,9] : [1,2,3,4,5,6,7,8,9]; 
 
             for (let r of rangeesActives) {
                 const vinsDeLaRangee = vinsAafficher.filter(v => v.rangee == r);
                 
-                // Si la rangée est vide, on ne l'affiche pas (sauf si on veut forcer l'affichage des étagères vides)
                 if (vinsDeLaRangee.length === 0) continue;
                 
                 const section = document.createElement('div');
-                section.className = "mb-6"; // Marge entre les rangées
+                section.className = "mb-6";
                 
-                // Titre de la rangée (Sticky)
+                // Si c'est 9, on affiche "Wish List" au lieu de "Rangée 9"
+                const titreRangee = r === 9 ? "⭐ Wish List" : `Rangée ${r}`;
+
                 const titreHTML = `
                     <div class="sticky top-16 bg-wine-dark/95 z-30 py-2 mb-2 border-b border-gray-800 flex justify-between items-end px-1">
-                        <h3 class="font-serif text-lg text-wine-gold italic">Rangée ${r}</h3>
+                        <h3 class="font-serif text-lg text-wine-gold italic">${titreRangee}</h3>
                         <span class="text-xs text-gray-500">${vinsDeLaRangee.length} bouteille(s)</span>
                     </div>
                 `;
 
-                // Conteneur Swipe (Horizontal Scroll)
-                // snap-x snap-mandatory: force l'arrêt sur une carte
-                // overflow-x-auto: active le scroll horizontal
                 const carouselHTML = `
                     <div class="flex overflow-x-auto gap-4 pb-4 px-1 snap-x snap-mandatory scrollbar-hide">
                         ${vinsDeLaRangee.map(v => genererCarte(v)).join('')}
@@ -237,7 +252,6 @@
                 grille.appendChild(section);
             }
             
-            // Si tout est vide
             if (grille.innerHTML === '') {
                 grille.innerHTML = '<div class="text-center text-gray-500 mt-10 italic">Aucun vin trouvé...</div>';
             }
@@ -247,10 +261,6 @@
             const img = (vin.image_url && vin.image_url.trim() !== "") ? vin.image_url : "https://images.unsplash.com/photo-1559563362-c667ba5f5480?auto=format&fit=crop&q=80&w=800";
             const badge = vin.type_vin === 'Rouge' ? 'bg-wine-red' : (vin.type_vin === 'Blanc' ? 'bg-yellow-100 text-black' : 'bg-pink-400');
             
-            // Adaptation CSS pour le Swipe :
-            // min-w-[45%] : sur mobile, on voit presque 2 cartes et demi.
-            // md:min-w-[200px] : sur ordi, taille fixe.
-            // snap-center : la carte se centre à l'arrêt du scroll.
             return `
             <div id="card-${vin.id}" class="snap-center shrink-0 min-w-[160px] w-[45%] md:w-[200px] bg-wine-card rounded-xl overflow-hidden border border-gray-800 flex flex-col shadow-lg relative h-[280px]">
                 <div class="h-40 relative cursor-pointer flex-shrink-0" onclick="ouvrirEdition(${vin.id})">
@@ -276,7 +286,6 @@
             msgSpan.innerText = message;
             
             toast.classList.remove('hidden');
-            // Petit hack pour forcer le navigateur à prendre en compte le remove 'hidden' avant de changer l'opacité
             setTimeout(() => { toast.classList.remove('opacity-0'); }, 10);
 
             if (duree > 0) {
@@ -287,7 +296,7 @@
             }
         }
 
-        // --- PHOTO AVEC REFRESH 10 SECONDES ---
+        // --- PHOTO ---
         function prendrePhoto() {
             document.getElementById('actions-camera').classList.add('hidden');
             document.getElementById('loading-state').classList.remove('hidden');
@@ -309,14 +318,13 @@
                 .then(res => { 
                     if(res.ok) { 
                         fermerCamera(); 
-                        // Lancer le timer de 10 secondes avec Feedback visuel
                         afficherToast("Analyse en cours... Mise à jour dans 10s", 10000);
                         
                         setTimeout(() => {
                             chargerVins().then(() => {
                                 afficherToast("Cave mise à jour !", 3000);
                             });
-                        }, 10000); // 10 secondes
+                        }, 10000);
                     } 
                 })
                 .catch(err => {
